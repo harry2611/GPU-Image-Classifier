@@ -144,10 +144,3 @@ This milestone is portable and works on CPU-only machines. The CUDA and Triton m
 5. Add benchmark reports comparing CPU, PyTorch GPU, CUDA, and Triton.
 6. Optionally expose inference through FastAPI or Streamlit.
 
-## Resume Bullet Templates
-
-Use these after the full project is benchmarked and evaluated:
-
-- Built an end-to-end image-classification system combining scikit-learn baselines, PyTorch CNNs, and custom GPU kernels across Fashion-MNIST/CIFAR-10 with reproducible evaluation and benchmarking pipelines.
-- Improved operator-level performance by `X%` using custom CUDA and Triton kernels compared with baseline PyTorch implementations while maintaining model quality targets.
-- Shipped a modular ML platform with automated metrics, confusion matrices, ROC-AUC reporting, and CPU vs GPU benchmark comparisons for production-style experimentation.
