@@ -3,8 +3,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from models.classical_models import SUPPORTED_CLASSICAL_MODELS
-from utils.config import ClassicalExperimentConfig, DatasetConfig, SUPPORTED_DATASETS
+from utils.config import (
+    ClassicalExperimentConfig,
+    DatasetConfig,
+    DeepLearningExperimentConfig,
+    SUPPORTED_CLASSICAL_MODELS,
+    SUPPORTED_DATASETS,
+    SUPPORTED_PYTORCH_MODELS,
+)
 from utils.logging_utils import configure_logging
 
 
@@ -73,6 +79,121 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not serialize trained sklearn models.",
     )
 
+    pytorch_parser = subparsers.add_parser(
+        "train-pytorch",
+        help="Train a PyTorch image classifier with GPU-aware execution when available.",
+    )
+    pytorch_parser.add_argument(
+        "--dataset",
+        choices=SUPPORTED_DATASETS,
+        default="fashion_mnist",
+        help="Dataset to download and train on.",
+    )
+    pytorch_parser.add_argument(
+        "--model",
+        choices=SUPPORTED_PYTORCH_MODELS,
+        default="simple_cnn",
+        help="PyTorch architecture to train.",
+    )
+    pytorch_parser.add_argument(
+        "--epochs",
+        type=int,
+        default=10,
+        help="Maximum number of training epochs.",
+    )
+    pytorch_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=128,
+        help="Batch size used for train, validation, and test loaders.",
+    )
+    pytorch_parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=0,
+        help="Number of worker processes for DataLoader instances.",
+    )
+    pytorch_parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=1e-3,
+        help="Initial AdamW learning rate.",
+    )
+    pytorch_parser.add_argument(
+        "--weight-decay",
+        type=float,
+        default=1e-4,
+        help="Weight decay used by AdamW.",
+    )
+    pytorch_parser.add_argument(
+        "--label-smoothing",
+        type=float,
+        default=0.0,
+        help="Optional label smoothing value for cross-entropy.",
+    )
+    pytorch_parser.add_argument(
+        "--early-stopping-patience",
+        type=int,
+        default=3,
+        help="Stop after this many non-improving validation epochs.",
+    )
+    pytorch_parser.add_argument(
+        "--device",
+        default="auto",
+        help="Execution device. Use auto, cpu, cuda, mps, or a device string like cuda:0.",
+    )
+    pytorch_parser.add_argument(
+        "--train-subset",
+        type=int,
+        default=None,
+        help="Optional stratified subset size for the train split.",
+    )
+    pytorch_parser.add_argument(
+        "--val-subset",
+        type=int,
+        default=None,
+        help="Optional stratified subset size for the validation split.",
+    )
+    pytorch_parser.add_argument(
+        "--test-subset",
+        type=int,
+        default=None,
+        help="Optional stratified subset size for the test split.",
+    )
+    pytorch_parser.add_argument(
+        "--validation-size",
+        type=float,
+        default=0.10,
+        help="Fraction of the training split to reserve for validation.",
+    )
+    pytorch_parser.add_argument(
+        "--random-state",
+        type=int,
+        default=42,
+        help="Random seed used for split creation and training reproducibility.",
+    )
+    pytorch_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("outputs"),
+        help="Directory where checkpoints, plots, and metrics are stored.",
+    )
+    pytorch_parser.add_argument(
+        "--use-pretrained",
+        action="store_true",
+        help="Use torchvision pretrained weights when training ResNet18.",
+    )
+    pytorch_parser.add_argument(
+        "--freeze-backbone",
+        action="store_true",
+        help="Freeze the ResNet18 backbone and only train the classifier head.",
+    )
+    pytorch_parser.add_argument(
+        "--skip-checkpoint-saving",
+        action="store_true",
+        help="Do not persist the best checkpoint to disk.",
+    )
+
     return parser
 
 
@@ -107,6 +228,44 @@ def main() -> None:
             save_models=not args.skip_model_saving,
         )
         run_classical_baselines(experiment_config)
+        return
+
+    if args.command == "train-pytorch":
+        try:
+            from training.pytorch_pipeline import run_pytorch_training
+        except ModuleNotFoundError as exc:
+            parser.exit(
+                status=1,
+                message=(
+                    f"Missing dependency '{exc.name}'. Install the project dependencies first "
+                    "with `pip install -e .`.\n"
+                ),
+            )
+        dataset_config = DatasetConfig(
+            name=args.dataset,
+            validation_size=args.validation_size,
+            random_state=args.random_state,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+        )
+        experiment_config = DeepLearningExperimentConfig(
+            dataset=dataset_config,
+            model_name=args.model,
+            output_dir=args.output_dir,
+            train_subset=args.train_subset,
+            val_subset=args.val_subset,
+            test_subset=args.test_subset,
+            device=args.device,
+            epochs=args.epochs,
+            learning_rate=args.learning_rate,
+            weight_decay=args.weight_decay,
+            label_smoothing=args.label_smoothing,
+            early_stopping_patience=args.early_stopping_patience,
+            use_pretrained=args.use_pretrained,
+            freeze_backbone=args.freeze_backbone,
+            save_checkpoint=not args.skip_checkpoint_saving,
+        )
+        run_pytorch_training(experiment_config)
 
 
 if __name__ == "__main__":

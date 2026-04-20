@@ -30,7 +30,7 @@ DATASET_STATS = {
 }
 
 
-@dataclass(slots=True)
+@dataclass
 class ClassicalDatasetSplits:
     X_train: np.ndarray
     y_train: np.ndarray
@@ -42,7 +42,7 @@ class ClassicalDatasetSplits:
     image_shape: tuple[int, ...]
 
 
-@dataclass(slots=True)
+@dataclass
 class TorchDataLoaders:
     train_loader: DataLoader
     val_loader: DataLoader
@@ -53,13 +53,28 @@ class TorchDataLoaders:
 
 
 def build_torch_transform(dataset_name: str) -> transforms.Compose:
+    return build_torch_transform_for_split(dataset_name, train=False)
+
+
+def build_torch_transform_for_split(dataset_name: str, train: bool) -> transforms.Compose:
     stats = DATASET_STATS[dataset_name]
-    return transforms.Compose(
+    transform_steps: list[object] = []
+
+    if train and dataset_name == "cifar10":
+        transform_steps.extend(
+            [
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+            ]
+        )
+
+    transform_steps.extend(
         [
             transforms.ToTensor(),
             transforms.Normalize(mean=stats["mean"], std=stats["std"]),
         ]
     )
+    return transforms.Compose(transform_steps)
 
 
 def download_dataset(config: DatasetConfig):
@@ -121,10 +136,14 @@ def create_torch_dataloaders(
     batch_size: int | None = None,
     num_workers: int | None = None,
     pin_memory: bool | None = None,
+    train_subset: int | None = None,
+    val_subset: int | None = None,
+    test_subset: int | None = None,
+    augment: bool = True,
 ) -> TorchDataLoaders:
     dataset_cls = DATASET_REGISTRY[config.name]
-    train_transform = build_torch_transform(config.name)
-    eval_transform = build_torch_transform(config.name)
+    train_transform = build_torch_transform_for_split(config.name, train=augment)
+    eval_transform = build_torch_transform_for_split(config.name, train=False)
 
     train_dataset = dataset_cls(
         root=str(config.data_dir),
@@ -149,6 +168,26 @@ def create_torch_dataloaders(
         config,
         np.asarray(train_dataset.targets),
     )
+    train_targets = np.asarray(train_dataset.targets)
+    test_targets = np.asarray(test_dataset.targets)
+    train_indices = _maybe_subsample_indices(
+        train_indices,
+        train_targets[train_indices],
+        subset_size=train_subset,
+        random_state=config.random_state,
+    )
+    val_indices = _maybe_subsample_indices(
+        val_indices,
+        train_targets[val_indices],
+        subset_size=val_subset,
+        random_state=config.random_state + 1,
+    )
+    test_indices = _maybe_subsample_indices(
+        np.arange(len(test_targets)),
+        test_targets,
+        subset_size=test_subset,
+        random_state=config.random_state + 2,
+    )
 
     effective_batch_size = batch_size or config.batch_size
     effective_num_workers = config.num_workers if num_workers is None else num_workers
@@ -169,20 +208,23 @@ def create_torch_dataloaders(
         pin_memory=effective_pin_memory,
     )
     test_loader = DataLoader(
-        test_dataset,
+        Subset(test_dataset, test_indices.tolist()),
         batch_size=effective_batch_size,
         shuffle=False,
         num_workers=effective_num_workers,
         pin_memory=effective_pin_memory,
     )
 
-    sample_shape = tuple(_extract_sample_image_shape(test_dataset))
+    sample_shape = tuple(_extract_sample_image_shape(test_loader.dataset))
+    class_names = list(getattr(train_dataset, "classes", [])) or [
+        str(label) for label in sorted(np.unique(train_targets))
+    ]
 
     return TorchDataLoaders(
         train_loader=train_loader,
         val_loader=val_loader,
         test_loader=test_loader,
-        class_names=list(getattr(train_dataset, "classes", [])),
+        class_names=class_names,
         image_shape=sample_shape,
         input_channels=sample_shape[0],
     )
@@ -271,3 +313,28 @@ def _maybe_subsample(
     )
     selected_indices, _ = next(splitter.split(index_array, labels))
     return images[selected_indices], labels[selected_indices]
+
+
+def _maybe_subsample_indices(
+    indices: np.ndarray,
+    labels: np.ndarray,
+    subset_size: int | None,
+    random_state: int,
+) -> np.ndarray:
+    if subset_size is None or subset_size >= len(indices):
+        return indices
+    if subset_size <= 0:
+        raise ValueError("subset_size must be positive when provided.")
+    if subset_size < len(np.unique(labels)):
+        raise ValueError(
+            "subset_size must be at least the number of classes for stratified sampling."
+        )
+
+    index_positions = np.arange(len(indices))
+    splitter = StratifiedShuffleSplit(
+        n_splits=1,
+        train_size=subset_size,
+        random_state=random_state,
+    )
+    selected_positions, _ = next(splitter.split(index_positions, labels))
+    return indices[selected_positions]

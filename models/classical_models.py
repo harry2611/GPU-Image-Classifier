@@ -6,11 +6,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 
-SUPPORTED_CLASSICAL_MODELS = (
-    "logistic_regression",
-    "svm",
-    "random_forest",
-)
+from utils.config import SUPPORTED_CLASSICAL_MODELS
 
 
 def build_classical_models(

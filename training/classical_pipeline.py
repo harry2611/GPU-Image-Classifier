@@ -18,14 +18,14 @@ from utils.io_utils import ensure_directories, write_csv, write_json
 LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
+@dataclass
 class SplitEvaluation:
     metrics: dict[str, object]
     inference_time_seconds: float
     confusion_matrix_path: str
 
 
-@dataclass(slots=True)
+@dataclass
 class ModelEvaluationResult:
     model_name: str
     train_time_seconds: float

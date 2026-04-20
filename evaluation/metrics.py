@@ -96,3 +96,45 @@ def plot_confusion_matrix(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close(figure)
+
+
+def plot_training_history(
+    history_rows: list[dict[str, float]],
+    output_path: Path,
+    title: str,
+) -> None:
+    if not history_rows:
+        return
+
+    epochs = [row["epoch"] for row in history_rows]
+    train_loss = [row["train_loss"] for row in history_rows]
+    validation_loss = [row["validation_loss"] for row in history_rows]
+    train_accuracy = [row["train_accuracy"] for row in history_rows]
+    validation_accuracy = [row["validation_accuracy"] for row in history_rows]
+    validation_f1 = [row["validation_f1_weighted"] for row in history_rows]
+
+    figure, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    axes[0].plot(epochs, train_loss, label="Train Loss", linewidth=2)
+    axes[0].plot(epochs, validation_loss, label="Validation Loss", linewidth=2)
+    axes[0].set_title("Loss")
+    axes[0].set_xlabel("Epoch")
+    axes[0].set_ylabel("Cross-Entropy Loss")
+    axes[0].grid(alpha=0.25)
+    axes[0].legend()
+
+    axes[1].plot(epochs, train_accuracy, label="Train Accuracy", linewidth=2)
+    axes[1].plot(epochs, validation_accuracy, label="Validation Accuracy", linewidth=2)
+    axes[1].plot(epochs, validation_f1, label="Validation F1", linewidth=2, linestyle="--")
+    axes[1].set_title("Accuracy and F1")
+    axes[1].set_xlabel("Epoch")
+    axes[1].set_ylabel("Score")
+    axes[1].set_ylim(0.0, 1.0)
+    axes[1].grid(alpha=0.25)
+    axes[1].legend()
+
+    figure.suptitle(title)
+    figure.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(figure)
