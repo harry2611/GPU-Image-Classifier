@@ -1,1 +1,1 @@
-"""Benchmarking utilities will be added in the performance-comparison milestone."""
+"""Benchmarking utilities for comparing CPU, PyTorch, CUDA, and Triton backends."""

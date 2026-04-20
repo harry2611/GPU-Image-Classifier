@@ -14,7 +14,7 @@ The project is being built in milestones so each layer stays understandable and 
 8. Benchmarking and comparison
 9. Optional demo app
 
-The current implementation covers steps 1-5, so you can compare classical baselines, a custom CNN, and a ResNet18 transfer-learning path from the same repo structure.
+The current implementation covers steps 1-8. The repo now includes an operator-level benchmarking path for image normalization across CPU PyTorch, PyTorch CUDA, a custom CUDA extension, and Triton.
 
 ## Why Fashion-MNIST First?
 
@@ -41,6 +41,10 @@ The code is structured so you can switch to `cifar10` from the CLI without chang
   - CUDA when available
   - MPS fallback on Apple Silicon
   - CPU fallback otherwise
+- operator-level GPU optimization:
+  - custom CUDA kernel for NCHW image normalization
+  - matching Triton kernel for the same operation
+  - benchmark harness that validates correctness and compares latency/bandwidth
 - evaluation outputs:
   - accuracy
   - precision
@@ -51,8 +55,10 @@ The code is structured so you can switch to `cifar10` from the CLI without chang
 - artifact generation:
   - JSON metrics
   - CSV summary tables
+  - kernel benchmark CSV and JSON reports
   - confusion-matrix plots
   - training-history curves
+  - kernel benchmark comparison plots
   - serialized sklearn models
   - best-model PyTorch checkpoints
 
@@ -93,6 +99,14 @@ If you want linting and tests as well:
 pip install -e ".[dev]"
 ```
 
+If you want the GPU benchmarking extras on a Linux machine with NVIDIA CUDA:
+
+```bash
+pip install -e ".[gpu]"
+```
+
+The custom CUDA extension also requires a working CUDA toolkit with `nvcc` available through `CUDA_HOME`.
+
 ## Run The Current Milestone
 
 Run the classical baseline pipeline on Fashion-MNIST:
@@ -131,6 +145,18 @@ Freeze the ResNet18 backbone for a fast transfer-learning baseline:
 python3 main.py train-pytorch --dataset cifar10 --model resnet18 --use-pretrained --freeze-backbone --epochs 8
 ```
 
+Run the image-normalization benchmark:
+
+```bash
+python3 main.py benchmark-kernels --operation image_normalization
+```
+
+Use a smaller tensor while you are iterating locally:
+
+```bash
+python3 main.py benchmark-kernels --batch-size 16 --channels 3 --height 64 --width 64 --benchmark-iterations 20
+```
+
 ## Outputs
 
 Artifacts are written under `outputs/`:
@@ -140,8 +166,11 @@ Artifacts are written under `outputs/`:
 - `outputs/metrics/*_history.csv`
 - `outputs/metrics/*_summary.csv`
 - `outputs/metrics/*_results.json`
+- `outputs/metrics/image_normalization_*_benchmark.csv`
+- `outputs/metrics/image_normalization_*_benchmark.json`
 - `outputs/figures/*_confusion_matrix.png`
 - `outputs/figures/*_training_curves.png`
+- `outputs/figures/image_normalization_*_benchmark.png`
 - `outputs/models/*.joblib`
 - `outputs/models/*.pt`
 
@@ -163,14 +192,21 @@ Artifacts are written under `outputs/`:
 
 `evaluation/metrics.py` keeps metrics logic in one place, which avoids scattered scoring code and makes later model comparisons much easier.
 
+### GPU Kernel Layer
+
+`cuda_kernels/image_normalization.py` loads a custom CUDA extension for per-channel image normalization, while `triton_kernels/image_normalization.py` implements the same NCHW operation in Triton for side-by-side benchmarking.
+
+### Benchmark Layer
+
+`benchmarking/image_normalization_benchmark.py` generates synthetic image tensors, validates each backend against the PyTorch reference implementation, times warmup and measured iterations, computes effective bandwidth, and saves CSV, JSON, and plot artifacts.
+
 ## Notes About GPU Work
 
-The classical and PyTorch milestones work on CPU-only machines. CUDA and Triton milestones will still require an NVIDIA CUDA environment to run end-to-end, but the training code already degrades gracefully to MPS or CPU when CUDA is unavailable.
+The classical and PyTorch milestones work on CPU-only machines. The kernel benchmark command also works on CPU-only machines, but it will mark the CUDA and Triton backends as skipped until you run it on a CUDA-capable NVIDIA environment. Apple Silicon MPS helps for model training, but it does not replace CUDA for the custom kernel and Triton parts.
 
 ## Next Steps
 
-1. Implement a custom CUDA kernel for image normalization or matrix multiplication.
-2. Implement the same operation in Triton.
-3. Add benchmark reports comparing CPU, PyTorch GPU, CUDA, and Triton.
-4. Optionally expose inference through FastAPI or Streamlit.
+1. Optionally add a second optimized operator such as matrix multiplication or depthwise convolution.
+2. Integrate benchmark findings into the training pipeline summary report.
+3. Optionally expose inference through FastAPI or Streamlit.
 

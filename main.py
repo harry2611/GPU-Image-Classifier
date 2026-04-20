@@ -7,6 +7,8 @@ from utils.config import (
     ClassicalExperimentConfig,
     DatasetConfig,
     DeepLearningExperimentConfig,
+    KernelBenchmarkConfig,
+    SUPPORTED_BENCHMARK_OPERATIONS,
     SUPPORTED_CLASSICAL_MODELS,
     SUPPORTED_DATASETS,
     SUPPORTED_PYTORCH_MODELS,
@@ -194,6 +196,70 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not persist the best checkpoint to disk.",
     )
 
+    benchmark_parser = subparsers.add_parser(
+        "benchmark-kernels",
+        help="Benchmark CPU, PyTorch CUDA, custom CUDA, and Triton kernels.",
+    )
+    benchmark_parser.add_argument(
+        "--operation",
+        choices=SUPPORTED_BENCHMARK_OPERATIONS,
+        default="image_normalization",
+        help="Kernel operation to benchmark.",
+    )
+    benchmark_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=64,
+        help="Batch size of the synthetic image tensor.",
+    )
+    benchmark_parser.add_argument(
+        "--channels",
+        type=int,
+        default=3,
+        help="Number of image channels in the synthetic tensor.",
+    )
+    benchmark_parser.add_argument(
+        "--height",
+        type=int,
+        default=224,
+        help="Height of the synthetic image tensor.",
+    )
+    benchmark_parser.add_argument(
+        "--width",
+        type=int,
+        default=224,
+        help="Width of the synthetic image tensor.",
+    )
+    benchmark_parser.add_argument(
+        "--warmup-iterations",
+        type=int,
+        default=10,
+        help="Warmup iterations to exclude from timing.",
+    )
+    benchmark_parser.add_argument(
+        "--benchmark-iterations",
+        type=int,
+        default=50,
+        help="Measured iterations for each backend.",
+    )
+    benchmark_parser.add_argument(
+        "--random-state",
+        type=int,
+        default=42,
+        help="Random seed used when generating synthetic benchmark inputs.",
+    )
+    benchmark_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("outputs"),
+        help="Directory where benchmark artifacts are stored.",
+    )
+    benchmark_parser.add_argument(
+        "--verbose-backend-loading",
+        action="store_true",
+        help="Show verbose output when loading CUDA or Triton backends.",
+    )
+
     return parser
 
 
@@ -266,6 +332,37 @@ def main() -> None:
             save_checkpoint=not args.skip_checkpoint_saving,
         )
         run_pytorch_training(experiment_config)
+        return
+
+    if args.command == "benchmark-kernels":
+        try:
+            from benchmarking.image_normalization_benchmark import (
+                run_image_normalization_benchmark,
+            )
+        except ModuleNotFoundError as exc:
+            parser.exit(
+                status=1,
+                message=(
+                    f"Missing dependency '{exc.name}'. Install the project dependencies first "
+                    "with `pip install -e .`.\n"
+                ),
+            )
+
+        benchmark_config = KernelBenchmarkConfig(
+            operation=args.operation,
+            output_dir=args.output_dir,
+            batch_size=args.batch_size,
+            channels=args.channels,
+            height=args.height,
+            width=args.width,
+            warmup_iterations=args.warmup_iterations,
+            benchmark_iterations=args.benchmark_iterations,
+            random_state=args.random_state,
+            verbose_backend_loading=args.verbose_backend_loading,
+        )
+
+        if benchmark_config.operation == "image_normalization":
+            run_image_normalization_benchmark(benchmark_config)
 
 
 if __name__ == "__main__":

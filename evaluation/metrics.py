@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
@@ -11,6 +11,9 @@ from sklearn.metrics import (
     precision_recall_fscore_support,
     roc_auc_score,
 )
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def compute_classification_metrics(
@@ -132,6 +135,41 @@ def plot_training_history(
     axes[1].set_ylim(0.0, 1.0)
     axes[1].grid(alpha=0.25)
     axes[1].legend()
+
+    figure.suptitle(title)
+    figure.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(figure)
+
+
+def plot_benchmark_results(
+    benchmark_rows: list[dict[str, object]],
+    output_path: Path,
+    title: str,
+) -> None:
+    completed_rows = [row for row in benchmark_rows if row["status"] == "completed"]
+    if not completed_rows:
+        return
+
+    backend_labels = [row["backend"] for row in completed_rows]
+    median_latency_ms = [row["median_latency_ms"] for row in completed_rows]
+    speedups = [row["speedup_vs_cpu"] or 1.0 for row in completed_rows]
+
+    figure, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    axes[0].bar(backend_labels, median_latency_ms, color="#2563eb")
+    axes[0].set_title("Median Latency")
+    axes[0].set_ylabel("Milliseconds")
+    axes[0].grid(axis="y", alpha=0.25)
+
+    axes[1].bar(backend_labels, speedups, color="#059669")
+    axes[1].set_title("Speedup vs CPU")
+    axes[1].set_ylabel("Relative Speedup")
+    axes[1].grid(axis="y", alpha=0.25)
+
+    for axis in axes:
+        axis.tick_params(axis="x", rotation=20)
 
     figure.suptitle(title)
     figure.tight_layout()

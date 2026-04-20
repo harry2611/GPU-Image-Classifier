@@ -11,6 +11,7 @@ SUPPORTED_CLASSICAL_MODELS = (
     "random_forest",
 )
 SUPPORTED_PYTORCH_MODELS = ("simple_cnn", "resnet18")
+SUPPORTED_BENCHMARK_OPERATIONS = ("image_normalization",)
 
 
 @dataclass
@@ -76,3 +77,31 @@ class DeepLearningExperimentConfig:
             raise ValueError("use_pretrained is only supported for the resnet18 model.")
         if self.freeze_backbone and self.model_name != "resnet18":
             raise ValueError("freeze_backbone is only supported for the resnet18 model.")
+
+
+@dataclass
+class KernelBenchmarkConfig:
+    operation: str = "image_normalization"
+    output_dir: Path = PROJECT_ROOT / "outputs"
+    batch_size: int = 64
+    channels: int = 3
+    height: int = 224
+    width: int = 224
+    warmup_iterations: int = 10
+    benchmark_iterations: int = 50
+    random_state: int = 42
+    verbose_backend_loading: bool = False
+
+    def __post_init__(self) -> None:
+        if self.operation not in SUPPORTED_BENCHMARK_OPERATIONS:
+            raise ValueError(f"Unsupported benchmark operation: {self.operation}")
+        for field_name in (
+            "batch_size",
+            "channels",
+            "height",
+            "width",
+            "warmup_iterations",
+            "benchmark_iterations",
+        ):
+            if getattr(self, field_name) <= 0:
+                raise ValueError(f"{field_name} must be a positive integer.")

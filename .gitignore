@@ -5,6 +5,7 @@ __pycache__/
 *.so
 *.egg-info/
 .pycache_temp/
+.cache/
 
 data/raw/*
 !data/raw/.gitkeep

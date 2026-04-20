@@ -23,6 +23,7 @@ dev = [
     "ruff>=0.4",
 ]
 gpu = [
+    "ninja>=1.11",
     "triton>=3.0; platform_system == 'Linux'",
 ]
 
