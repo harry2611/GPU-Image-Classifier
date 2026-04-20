@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +9,8 @@ from time import perf_counter
 
 import joblib
 import numpy as np
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.pipeline import Pipeline
 
 from data.dataset_manager import prepare_classical_dataset
 from evaluation.metrics import compute_classification_metrics, plot_confusion_matrix
@@ -65,7 +68,12 @@ def run_classical_baselines(config: ClassicalExperimentConfig) -> dict[str, obje
     for model_name, estimator in selected_models.items():
         LOGGER.info("Training classical baseline: %s", model_name)
         training_start = perf_counter()
-        estimator.fit(dataset.X_train, dataset.y_train)
+        _fit_estimator_with_clean_logging(
+            estimator=estimator,
+            X_train=dataset.X_train,
+            y_train=dataset.y_train,
+            model_name=model_name,
+        )
         train_time_seconds = perf_counter() - training_start
 
         if config.save_models:
@@ -164,8 +172,9 @@ def _evaluate_split(
     model_name: str,
 ) -> SplitEvaluation:
     inference_start = perf_counter()
-    y_pred = estimator.predict(X)
-    y_scores = _extract_scores(estimator, X)
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        y_pred = estimator.predict(X)
+        y_scores = _extract_scores(estimator, X)
     inference_time_seconds = perf_counter() - inference_start
 
     metrics = compute_classification_metrics(
@@ -200,3 +209,49 @@ def _extract_scores(estimator, X: np.ndarray) -> np.ndarray | None:
 
 def _round_optional_metric(value: float | None) -> float | None:
     return None if value is None else round(value, 4)
+
+
+def _fit_estimator_with_clean_logging(
+    estimator,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    model_name: str,
+) -> None:
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        warnings.simplefilter("always")
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            estimator.fit(X_train, y_train)
+
+    for warning in caught_warnings:
+        if _is_benign_sklearn_runtime_warning(warning):
+            continue
+        if issubclass(warning.category, ConvergenceWarning):
+            LOGGER.warning("%s required more optimization steps: %s", model_name, warning.message)
+            continue
+        warnings.warn_explicit(
+            message=warning.message,
+            category=warning.category,
+            filename=warning.filename,
+            lineno=warning.lineno,
+        )
+
+    _assert_finite_model_parameters(estimator=estimator, model_name=model_name)
+
+
+def _is_benign_sklearn_runtime_warning(warning: warnings.WarningMessage) -> bool:
+    if not issubclass(warning.category, RuntimeWarning):
+        return False
+    warning_filename = str(warning.filename or "")
+    return "site-packages/sklearn" in warning_filename
+
+
+def _assert_finite_model_parameters(estimator, model_name: str) -> None:
+    fitted_estimator = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
+
+    for attribute_name in ("coef_", "intercept_", "feature_importances_"):
+        if hasattr(fitted_estimator, attribute_name):
+            values = np.asarray(getattr(fitted_estimator, attribute_name))
+            if not np.isfinite(values).all():
+                raise ValueError(
+                    f"{model_name} produced non-finite values in '{attribute_name}'."
+                )

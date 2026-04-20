@@ -3,6 +3,8 @@
 __pycache__/
 *.py[cod]
 *.so
+*.egg-info/
+.pycache_temp/
 
 data/raw/*
 !data/raw/.gitkeep

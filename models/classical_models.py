@@ -16,27 +16,34 @@ def build_classical_models(
     return {
         "logistic_regression": Pipeline(
             steps=[
-                ("scaler", StandardScaler()),
+                (
+                    "scaler",
+                    # Image pixels are already normalized to [0, 1]. Centering helps the
+                    # linear solvers, while skipping variance scaling avoids exploding
+                    # rare low-variance pixels.
+                    StandardScaler(with_std=False),
+                ),
                 (
                     "model",
                     LogisticRegression(
-                        max_iter=400,
-                        solver="lbfgs",
-                        multi_class="multinomial",
+                        max_iter=2000,
+                        solver="saga",
                         random_state=random_state,
+                        tol=5e-3,
                     ),
                 ),
             ]
         ),
         "svm": Pipeline(
             steps=[
-                ("scaler", StandardScaler()),
+                ("scaler", StandardScaler(with_std=False)),
                 (
                     "model",
                     LinearSVC(
                         random_state=random_state,
-                        dual="auto",
-                        max_iter=5000,
+                        dual=False,
+                        max_iter=8000,
+                        tol=1e-3,
                     ),
                 ),
             ]
