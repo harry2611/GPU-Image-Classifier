@@ -15,3 +15,10 @@ data/processed/*
 
 outputs/*
 !outputs/.gitkeep
+!outputs/metrics/
+!outputs/figures/
+outputs/metrics/*
+outputs/figures/*
+!outputs/metrics/*.csv
+!outputs/metrics/*.json
+!outputs/figures/*.png

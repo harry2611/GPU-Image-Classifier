@@ -1,0 +1,5 @@
+backend,device,status,mean_latency_ms,median_latency_ms,std_latency_ms,effective_bandwidth_gbps,speedup_vs_cpu,max_abs_error,notes
+torch_cpu,cpu,completed,2.0332,1.8224,0.506,42.2897,1.0,0.0,PyTorch reference implementation on CPU.
+torch_cuda,cuda,skipped,,,,,,,CUDA is not available on this machine.
+cuda_extension,cuda,skipped,,,,,,,"CUDA is not available, so the custom extension cannot run."
+triton,cuda,skipped,,,,,,,"CUDA is not available, so the Triton kernel cannot run."

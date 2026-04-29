@@ -157,6 +157,22 @@ Use a smaller tensor while you are iterating locally:
 python3 main.py benchmark-kernels --batch-size 16 --channels 3 --height 64 --width 64 --benchmark-iterations 20
 ```
 
+## Sample Run Logs
+
+The screenshots below come from a real run on a MacBook Air (Apple Silicon), captured on 2026-04-29. They show the CLI in action across the classical and deep-learning milestones.
+
+### Classical Baselines on Fashion-MNIST
+
+![Classical baselines run](docs/screenshots/classical_baselines_run.jpg)
+
+A short run with the `classical-baselines` command using a 12,000-sample stratified training subset and a 3,000-sample test subset. Logistic Regression trains in roughly 11 seconds and Random Forest in about 4 seconds. The pipeline picks Random Forest as the best validation model and writes the leaderboard to `outputs/metrics/classical_summary.csv`. On this subset, Random Forest reaches **0.858 test accuracy** and **0.987 ROC-AUC**, with Logistic Regression close behind at **0.825 test accuracy**.
+
+### SimpleCNN Training on MPS
+
+![SimpleCNN training run](docs/screenshots/simple_cnn_training_run.jpg)
+
+The `train-pytorch` command running the custom `simple_cnn` architecture on Apple Silicon's MPS backend for 5 epochs. The model has 391,370 trainable parameters. Validation accuracy climbs from 0.792 in the first epoch to **0.924 by epoch 5**, comfortably beating the Random Forest baseline by roughly 5.5 points on test accuracy (final test accuracy **0.913**, ROC-AUC **0.995**). The cosine learning-rate schedule decays from 9e-4 down to 0 across the run, which is why the largest validation jump appears at epoch 4 once the learning rate is small enough for fine-tuning. The `FutureWarning` about `torch.cuda.amp.GradScaler` is cosmetic and does not affect results.
+
 ## Outputs
 
 Artifacts are written under `outputs/`:

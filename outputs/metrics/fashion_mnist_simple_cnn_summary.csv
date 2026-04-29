@@ -1,0 +1,2 @@
+dataset,model,device,epochs_completed,best_epoch,trainable_parameters,validation_accuracy,validation_f1_weighted,test_accuracy,test_f1_weighted,test_roc_auc_ovr_weighted
+fashion_mnist,simple_cnn,mps,5,5,391370,0.9242,0.9245,0.9126,0.9131,0.9945

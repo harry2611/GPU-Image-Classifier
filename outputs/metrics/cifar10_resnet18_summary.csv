@@ -1,0 +1,2 @@
+dataset,model,device,epochs_completed,best_epoch,trainable_parameters,validation_accuracy,validation_f1_weighted,test_accuracy,test_f1_weighted,test_roc_auc_ovr_weighted
+cifar10,resnet18,mps,12,12,11181642,0.868,0.8678,0.8705,0.8701,0.9891
