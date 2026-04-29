@@ -260,6 +260,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show verbose output when loading CUDA or Triton backends.",
     )
 
+    report_parser = subparsers.add_parser(
+        "generate-report",
+        help="Combine the latest classical, PyTorch, and benchmark results into a single markdown report.",
+    )
+    report_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("outputs"),
+        help="Directory containing metrics/ and where reports/ will be written.",
+    )
+
     return parser
 
 
@@ -363,6 +374,14 @@ def main() -> None:
 
         if benchmark_config.operation == "image_normalization":
             run_image_normalization_benchmark(benchmark_config)
+        return
+
+    if args.command == "generate-report":
+        from evaluation.report import generate_run_report
+
+        report_path = generate_run_report(args.output_dir)
+        print(f"Wrote unified run report to {report_path}")
+        return
 
 
 if __name__ == "__main__":

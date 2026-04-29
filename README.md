@@ -14,7 +14,7 @@ The project is being built in milestones so each layer stays understandable and 
 8. Benchmarking and comparison
 9. Optional demo app
 
-The current implementation covers steps 1-8. The repo now includes an operator-level benchmarking path for image normalization across CPU PyTorch, PyTorch CUDA, a custom CUDA extension, and Triton.
+All nine milestones are now implemented. The repo includes an operator-level benchmarking path for image normalization across CPU PyTorch, PyTorch CUDA, a custom CUDA extension, and Triton, plus a Streamlit inference demo and a unified report generator that combines results across pipelines.
 
 ## Why Fashion-MNIST First?
 
@@ -107,6 +107,12 @@ pip install -e ".[gpu]"
 
 The custom CUDA extension also requires a working CUDA toolkit with `nvcc` available through `CUDA_HOME`.
 
+For the Streamlit inference demo:
+
+```bash
+pip install -e ".[demo]"
+```
+
 ## Run The Current Milestone
 
 Run the classical baseline pipeline on Fashion-MNIST:
@@ -157,6 +163,22 @@ Use a smaller tensor while you are iterating locally:
 python3 main.py benchmark-kernels --batch-size 16 --channels 3 --height 64 --width 64 --benchmark-iterations 20
 ```
 
+Generate a unified markdown report combining the latest classical, PyTorch, and benchmark results:
+
+```bash
+python3 main.py generate-report
+```
+
+The report is written to `outputs/reports/run_summary.md`. It auto-discovers whatever metric files exist under `outputs/metrics/`, so you can re-run it any time after a fresh experiment.
+
+Run the Streamlit inference demo (after `pip install -e ".[demo]"`):
+
+```bash
+streamlit run app/inference_app.py
+```
+
+The app loads any saved checkpoint from `outputs/models/`, lets you upload an image, and shows the top-3 predicted classes with probabilities. Use the sidebar to switch between models or pick a specific device (CUDA / MPS / CPU). Image preprocessing matches the per-channel mean/std the model was trained on.
+
 ## Sample Run Logs
 
 The screenshots below come from a real run on a MacBook Air (Apple Silicon), captured on 2026-04-29. They show the CLI in action across the classical and deep-learning milestones.
@@ -189,6 +211,7 @@ Artifacts are written under `outputs/`:
 - `outputs/figures/image_normalization_*_benchmark.png`
 - `outputs/models/*.joblib`
 - `outputs/models/*.pt`
+- `outputs/reports/run_summary.md`
 
 ## Architecture Overview
 
@@ -216,13 +239,23 @@ Artifacts are written under `outputs/`:
 
 `benchmarking/image_normalization_benchmark.py` generates synthetic image tensors, validates each backend against the PyTorch reference implementation, times warmup and measured iterations, computes effective bandwidth, and saves CSV, JSON, and plot artifacts.
 
+### Reporting Layer
+
+`evaluation/report.py` walks `outputs/metrics/` and stitches the most recent classical, PyTorch, and kernel benchmark results into a single markdown summary at `outputs/reports/run_summary.md`. Sections with no data are skipped automatically, so the report stays useful when only some pipelines have been run.
+
+### Demo App
+
+`app/inference_app.py` is a Streamlit front end that auto-discovers checkpoints under `outputs/models/`, normalizes uploaded images using the same per-channel statistics used during training, and shows the top-3 predictions with their probabilities. It works on CPU, MPS, or CUDA depending on which devices are available.
+
 ## Notes About GPU Work
 
 The classical and PyTorch milestones work on CPU-only machines. The kernel benchmark command also works on CPU-only machines, but it will mark the CUDA and Triton backends as skipped until you run it on a CUDA-capable NVIDIA environment. Apple Silicon MPS helps for model training, but it does not replace CUDA for the custom kernel and Triton parts.
 
 ## Next Steps
 
-1. Optionally add a second optimized operator such as matrix multiplication or depthwise convolution.
-2. Integrate benchmark findings into the training pipeline summary report.
-3. Optionally expose inference through FastAPI or Streamlit.
+The original nine milestones are complete. Reasonable directions for further work:
+
+1. Add a second optimized operator such as matrix multiplication or depthwise convolution to broaden the kernel benchmark surface.
+2. Run the kernel benchmark on a Linux + NVIDIA machine to replace the `skipped` rows for `torch_cuda`, `cuda_extension`, and `triton` with real timings.
+3. Add an optional FastAPI inference service so the same checkpoints can be served programmatically alongside the Streamlit demo.
 

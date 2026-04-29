@@ -26,6 +26,10 @@ gpu = [
     "ninja>=1.11",
     "triton>=3.0; platform_system == 'Linux'",
 ]
+demo = [
+    "streamlit>=1.32",
+    "Pillow>=10.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["app", "benchmarking", "cuda_kernels", "data", "evaluation", "models", "training", "triton_kernels", "utils"]

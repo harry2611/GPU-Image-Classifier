@@ -66,7 +66,7 @@ def run_pytorch_training(config: DeepLearningExperimentConfig) -> dict[str, obje
     )
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs)
     use_amp = device.type == "cuda"
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     LOGGER.info(
         "Training %s on %s with %d trainable parameters",
@@ -255,7 +255,7 @@ def _train_one_epoch(
     data_loader,
     criterion: nn.Module,
     optimizer: optim.Optimizer,
-    scaler: torch.cuda.amp.GradScaler,
+    scaler: torch.amp.GradScaler,
     device: torch.device,
     class_names: list[str],
     use_amp: bool,

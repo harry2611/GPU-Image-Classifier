@@ -17,8 +17,11 @@ outputs/*
 !outputs/.gitkeep
 !outputs/metrics/
 !outputs/figures/
+!outputs/reports/
 outputs/metrics/*
 outputs/figures/*
+outputs/reports/*
 !outputs/metrics/*.csv
 !outputs/metrics/*.json
 !outputs/figures/*.png
+!outputs/reports/*.md
