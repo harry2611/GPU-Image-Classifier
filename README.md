@@ -193,7 +193,27 @@ A short run with the `classical-baselines` command using a 12,000-sample stratif
 
 ![SimpleCNN training run](docs/screenshots/simple_cnn_training_run.jpg)
 
-The `train-pytorch` command running the custom `simple_cnn` architecture on Apple Silicon's MPS backend for 5 epochs. The model has 391,370 trainable parameters. Validation accuracy climbs from 0.792 in the first epoch to **0.924 by epoch 5**, comfortably beating the Random Forest baseline by roughly 5.5 points on test accuracy (final test accuracy **0.913**, ROC-AUC **0.995**). The cosine learning-rate schedule decays from 9e-4 down to 0 across the run, which is why the largest validation jump appears at epoch 4 once the learning rate is small enough for fine-tuning. The `FutureWarning` about `torch.cuda.amp.GradScaler` is cosmetic and does not affect results.
+The `train-pytorch` command running the custom `simple_cnn` architecture on Apple Silicon's MPS backend for 5 epochs. The model has 391,370 trainable parameters. Validation accuracy climbs from 0.792 in the first epoch to **0.924 by epoch 5**, comfortably beating the Random Forest baseline by roughly 5.5 points on test accuracy (final test accuracy **0.913**, ROC-AUC **0.995**). The cosine learning-rate schedule decays from 9e-4 down to 0 across the run, which is why the largest validation jump appears at epoch 4 once the learning rate is small enough for fine-tuning.
+
+### Streamlit Inference Demo - Fashion-MNIST
+
+![Streamlit demo with Fashion-MNIST T-shirt uploaded](docs/screenshots/demo_fashion_mnist_upload.png)
+
+The Streamlit demo app running locally at `http://localhost:8501`. The sidebar shows the active checkpoint (`fashion_mnist_simple_cnn_best.pt`) and the resolved device (`auto`, which falls back to MPS on Apple Silicon). The user has uploaded a black T-shirt product photo, which the app immediately previews under "Uploaded image" before running inference. The app auto-discovers any `.pt` checkpoint placed in `outputs/models/`, so you can switch between models without restarting the server.
+
+![Top-3 prediction output for the Fashion-MNIST T-shirt](docs/screenshots/demo_fashion_mnist_prediction.png)
+
+The same flow scrolled down to the prediction panel. The model correctly identifies the image as **T-shirt/top with 61.9% confidence**, with Bag (14.2%) and Pullover (13.5%) as the runners-up. The probability bar chart visualizes how the model distributed its score across the top three classes, which makes calibration and ambiguity easy to read at a glance. Image preprocessing matches training exactly: convert to grayscale, resize to 28x28, and normalize with the per-channel statistics defined in `data/dataset_manager.DATASET_STATS`.
+
+### Streamlit Inference Demo - CIFAR-10 ResNet18
+
+![Streamlit demo with CIFAR-10 airplane uploaded](docs/screenshots/demo_cifar10_upload.png)
+
+The same demo app, but with the sidebar switched to `cifar10_resnet18_best.pt`. The user has uploaded a photo of an Emirates airplane in flight. Because this is a CIFAR-10 model, the app preprocesses the image as RGB at 32x32 with the CIFAR-10 mean/std, instead of the grayscale 28x28 path used for Fashion-MNIST. The dropdown driven device selector still works the same way - the model is moved to the chosen device when it loads.
+
+![Top-3 prediction output for the CIFAR-10 airplane](docs/screenshots/demo_cifar10_prediction.png)
+
+The prediction view for the airplane image. The fine-tuned ResNet18 nails the class with **97.0% confidence on "airplane"**, with automobile a distant second at 2.5% and truck at 0.3%. This is a clean, high-confidence prediction on a clearly in-distribution image, which contrasts with the more ambiguous Fashion-MNIST result above and demonstrates that the same demo app handles both grayscale clothing and natural RGB imagery correctly.
 
 ## Outputs
 
