@@ -267,15 +267,42 @@ Artifacts are written under `outputs/`:
 
 `app/inference_app.py` is a Streamlit front end that auto-discovers checkpoints under `outputs/models/`, normalizes uploaded images using the same per-channel statistics used during training, and shows the top-3 predictions with their probabilities. It works on CPU, MPS, or CUDA depending on which devices are available.
 
+## GPU Kernel Benchmark Results
+
+All four backends were benchmarked on a **Tesla T4 GPU** (Google Colab) with a synthetic tensor of shape `[64, 3, 224, 224]` over 100 measured iterations. The custom CUDA kernel was profiled with Nsight Compute and then optimized before the final numbers below were captured.
+
+| Backend | Median Latency | Bandwidth | Speedup vs CPU |
+|---|---|---|---|
+| torch_cpu | 37.39 ms | 2.06 GB/s | 1.0x |
+| torch_cuda | 0.74 ms | 104.79 GB/s | 50.8x |
+| cuda_extension | **0.35 ms** | **222.05 GB/s** | **107.7x** |
+| triton | 0.39 ms | 198.21 GB/s | 96.2x |
+
+The custom CUDA extension is **2.1x faster than PyTorch's own CUDA implementation** and outperforms the Triton kernel at this tensor size.
+
+### Kernel Optimization with Nsight Compute
+
+Nsight Compute profiling on the initial v1 kernel revealed two bottlenecks:
+
+- **SM throughput at 48% of peak** — caused by a 64-bit integer division `(index / channel_stride) % channels` running on every thread, producing 359 million integer instructions for 9.6 million elements (~37 int ops per element)
+- **Memory bandwidth at 120 GB/s** (37% of T4's 320 GB/s peak) — caused by scalar `float` loads issuing one memory transaction per element
+
+The v2 kernel addresses both:
+
+- **`float4` vectorized loads** — 4 elements read per thread, reducing memory transactions by 4x and raising effective bandwidth from 148 GB/s to 222 GB/s
+- **3D grid launch** — channel index comes free from `blockIdx.y` and batch index from `blockIdx.z`, eliminating all integer division from the hot path
+
+Result: **33% latency reduction** (0.52 ms → 0.35 ms) and **50% bandwidth improvement** (148 GB/s → 222 GB/s).
+
 ## Notes About GPU Work
 
-The classical and PyTorch milestones work on CPU-only machines. The kernel benchmark command also works on CPU-only machines, but it will mark the CUDA and Triton backends as skipped until you run it on a CUDA-capable NVIDIA environment. Apple Silicon MPS helps for model training, but it does not replace CUDA for the custom kernel and Triton parts.
+The classical and PyTorch milestones work on CPU-only machines. The kernel benchmark command also runs on CPU-only machines but will skip the CUDA and Triton backends — a CUDA-capable NVIDIA GPU is required to benchmark all four paths. Apple Silicon MPS helps for model training but does not support the custom CUDA extension or Triton kernel.
 
 ## Next Steps
 
 The original nine milestones are complete. Reasonable directions for further work:
 
-1. Add a second optimized operator such as matrix multiplication or depthwise convolution to broaden the kernel benchmark surface.
-2. Run the kernel benchmark on a Linux + NVIDIA machine to replace the `skipped` rows for `torch_cuda`, `cuda_extension`, and `triton` with real timings.
-3. Add an optional FastAPI inference service so the same checkpoints can be served programmatically alongside the Streamlit demo.
+1. Add a second optimized operator such as depthwise convolution or matrix multiplication to broaden the kernel benchmark surface.
+2. Add an optional FastAPI inference service so the same checkpoints can be served programmatically alongside the Streamlit demo.
+3. Extend Nsight profiling to the Triton kernel to compare low-level metrics between the two GPU backends.
 
