@@ -269,40 +269,58 @@ Artifacts are written under `outputs/`:
 
 ## GPU Kernel Benchmark Results
 
-All four backends were benchmarked on a **Tesla T4 GPU** (Google Colab) with a synthetic tensor of shape `[64, 3, 224, 224]` over 100 measured iterations. The custom CUDA kernel was profiled with Nsight Compute and then optimized before the final numbers below were captured.
+All four backends were benchmarked on a **Tesla T4 GPU** (Google Colab) with a synthetic tensor of shape `[64, 3, 224, 224]` over 100 measured iterations. The custom CUDA kernel was profiled with Nsight Compute, optimized, and re-measured to produce the final numbers below.
+
+### v1 Baseline — Before Optimization
+
+![v1 benchmark command and raw JSON](docs/screenshots/colab_v1_benchmark_run.png)
+
+The benchmark harness runs on Colab's T4 GPU. The JSON output confirms all four backends completed successfully with no errors.
+
+![v1 benchmark results across all backends](docs/screenshots/colab_v1_benchmark_results.png)
+
+Raw v1 results with the original scalar kernel:
+
+| Backend | Median Latency | Bandwidth | Speedup vs CPU |
+|---|---|---|---|
+| torch_cpu | 41.08 ms | 1.88 GB/s | 1.0x |
+| torch_cuda | 0.67 ms | 115.66 GB/s | 61.6x |
+| cuda_extension (v1) | 0.52 ms | 148.26 GB/s | 79.0x |
+| triton | 0.39 ms | 198.95 GB/s | 106.0x |
+
+### Nsight Compute Profiling
+
+![Nsight Compute output for the v1 kernel](docs/screenshots/colab_nsight_profile.png)
+
+Nsight Compute was run against the v1 kernel to identify bottlenecks. Three passes of `normalize_images_kernel` were captured, each reporting consistent metrics:
+
+| Metric | Value | Interpretation |
+|---|---|---|
+| SM throughput | 48% of peak | GPU half-utilized |
+| Memory load bandwidth | 120 GB/s | Only 37% of T4's 320 GB/s peak |
+| Warp occupancy | 83% | Decent, not the bottleneck |
+| Integer instructions | 359,612,470 | ~37 int ops per element — caused by 64-bit division |
+
+The root cause was the expression `(index / channel_stride) % channels` executing on every thread — a 64-bit integer division for each of 9.6 million elements, producing 359 million integer instructions and throttling SM throughput to 48%. Scalar `float` loads were also leaving 63% of memory bandwidth unused.
+
+### v2 Optimized Kernel — After Optimization
+
+![v2 kernel written and benchmark results](docs/screenshots/colab_v2_benchmark_results.png)
+
+Two changes were made based on the Nsight findings:
+
+- **`float4` vectorized loads** — 4 elements read per thread instead of 1, cutting memory transactions by 4x
+- **3D grid launch** — channel index comes free from `blockIdx.y` and batch index from `blockIdx.z`, eliminating all integer division from the hot path
+
+Final v2 results:
 
 | Backend | Median Latency | Bandwidth | Speedup vs CPU |
 |---|---|---|---|
 | torch_cpu | 37.39 ms | 2.06 GB/s | 1.0x |
 | torch_cuda | 0.74 ms | 104.79 GB/s | 50.8x |
-| cuda_extension | **0.35 ms** | **222.05 GB/s** | **107.7x** |
+| cuda_extension (v2) | **0.35 ms** | **222.05 GB/s** | **107.7x** |
 | triton | 0.39 ms | 198.21 GB/s | 96.2x |
 
-The custom CUDA extension is **2.1x faster than PyTorch's own CUDA implementation** and outperforms the Triton kernel at this tensor size.
+The v2 custom CUDA kernel is **33% faster and 50% higher bandwidth** than v1, runs **2.1x faster than PyTorch's own CUDA implementation**, and outperforms the Triton kernel at this tensor size.
 
-### Kernel Optimization with Nsight Compute
-
-Nsight Compute profiling on the initial v1 kernel revealed two bottlenecks:
-
-- **SM throughput at 48% of peak** — caused by a 64-bit integer division `(index / channel_stride) % channels` running on every thread, producing 359 million integer instructions for 9.6 million elements (~37 int ops per element)
-- **Memory bandwidth at 120 GB/s** (37% of T4's 320 GB/s peak) — caused by scalar `float` loads issuing one memory transaction per element
-
-The v2 kernel addresses both:
-
-- **`float4` vectorized loads** — 4 elements read per thread, reducing memory transactions by 4x and raising effective bandwidth from 148 GB/s to 222 GB/s
-- **3D grid launch** — channel index comes free from `blockIdx.y` and batch index from `blockIdx.z`, eliminating all integer division from the hot path
-
-Result: **33% latency reduction** (0.52 ms → 0.35 ms) and **50% bandwidth improvement** (148 GB/s → 222 GB/s).
-
-## Notes About GPU Work
-
-The classical and PyTorch milestones work on CPU-only machines. The kernel benchmark command also runs on CPU-only machines but will skip the CUDA and Triton backends — a CUDA-capable NVIDIA GPU is required to benchmark all four paths. Apple Silicon MPS helps for model training but does not support the custom CUDA extension or Triton kernel.
-
-## Next Steps
-
-The original nine milestones are complete. Reasonable directions for further work:
-
-1. Add a second optimized operator such as depthwise convolution or matrix multiplication to broaden the kernel benchmark surface.
-2. Add an optional FastAPI inference service so the same checkpoints can be served programmatically alongside the Streamlit demo.
-3. Extend Nsight profiling to the Triton kernel to compare low-level metrics between the two GPU backends.
 
