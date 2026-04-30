@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-04-20T07:10:27.071884+00:00",
+  "generated_at_utc": "2026-04-30T01:21:53.869552+00:00",
   "operation": "image_normalization",
   "tensor_shape": [
     64,
@@ -8,23 +8,23 @@
     224
   ],
   "warmup_iterations": 10,
-  "benchmark_iterations": 50,
+  "benchmark_iterations": 100,
   "environment": {
-    "platform": "macOS-26.3.1-arm64-arm-64bit",
-    "python_version": "3.9.6",
-    "torch_version": "2.8.0",
-    "cuda_available": false,
-    "torch_cuda_version": null
+    "platform": "Linux-6.6.113+-x86_64-with-glibc2.35",
+    "python_version": "3.12.13",
+    "torch_version": "2.10.0+cu128",
+    "cuda_available": true,
+    "torch_cuda_version": "12.8"
   },
   "results": [
     {
       "backend": "torch_cpu",
       "device": "cpu",
       "status": "completed",
-      "mean_latency_ms": 2.0332,
-      "median_latency_ms": 1.8224,
-      "std_latency_ms": 0.506,
-      "effective_bandwidth_gbps": 42.2897,
+      "mean_latency_ms": 38.0985,
+      "median_latency_ms": 37.3916,
+      "std_latency_ms": 2.4906,
+      "effective_bandwidth_gbps": 2.0612,
       "speedup_vs_cpu": 1.0,
       "max_abs_error": 0.0,
       "notes": "PyTorch reference implementation on CPU."
@@ -32,38 +32,38 @@
     {
       "backend": "torch_cuda",
       "device": "cuda",
-      "status": "skipped",
-      "mean_latency_ms": null,
-      "median_latency_ms": null,
-      "std_latency_ms": null,
-      "effective_bandwidth_gbps": null,
-      "speedup_vs_cpu": null,
-      "max_abs_error": null,
-      "notes": "CUDA is not available on this machine."
+      "status": "completed",
+      "mean_latency_ms": 0.7389,
+      "median_latency_ms": 0.7355,
+      "std_latency_ms": 0.0075,
+      "effective_bandwidth_gbps": 104.7872,
+      "speedup_vs_cpu": 50.8383,
+      "max_abs_error": 0.0,
+      "notes": "PyTorch broadcasting on CUDA."
     },
     {
       "backend": "cuda_extension",
       "device": "cuda",
-      "status": "skipped",
-      "mean_latency_ms": null,
-      "median_latency_ms": null,
-      "std_latency_ms": null,
-      "effective_bandwidth_gbps": null,
-      "speedup_vs_cpu": null,
-      "max_abs_error": null,
-      "notes": "CUDA is not available, so the custom extension cannot run."
+      "status": "completed",
+      "mean_latency_ms": 0.3507,
+      "median_latency_ms": 0.3471,
+      "std_latency_ms": 0.0095,
+      "effective_bandwidth_gbps": 222.0471,
+      "speedup_vs_cpu": 107.7257,
+      "max_abs_error": 2.4e-07,
+      "notes": "Custom CUDA extension compiled through torch.utils.cpp_extension."
     },
     {
       "backend": "triton",
       "device": "cuda",
-      "status": "skipped",
-      "mean_latency_ms": null,
-      "median_latency_ms": null,
-      "std_latency_ms": null,
-      "effective_bandwidth_gbps": null,
-      "speedup_vs_cpu": null,
-      "max_abs_error": null,
-      "notes": "CUDA is not available, so the Triton kernel cannot run."
+      "status": "completed",
+      "mean_latency_ms": 0.3917,
+      "median_latency_ms": 0.3888,
+      "std_latency_ms": 0.0121,
+      "effective_bandwidth_gbps": 198.2058,
+      "speedup_vs_cpu": 96.1718,
+      "max_abs_error": 2.4e-07,
+      "notes": "Triton JIT kernel for NCHW image normalization."
     }
   ],
   "artifacts": {
